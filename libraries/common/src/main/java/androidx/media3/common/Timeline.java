@@ -423,6 +423,11 @@ public abstract class Timeline implements Bundleable {
       return result;
     }
 
+    @Override
+    public String toString() {
+      return super.toString() + "[ " + durationUs + ", " + durationUs + ", " + defaultPositionUs + ", " + isPlaceholder +"]";
+    }
+
     // Bundleable implementation.
 
     private static final String FIELD_MEDIA_ITEM = Util.intToStringMaxRadix(1);

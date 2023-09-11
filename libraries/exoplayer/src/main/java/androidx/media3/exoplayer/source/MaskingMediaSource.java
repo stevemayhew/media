@@ -26,6 +26,7 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.Timeline;
 import androidx.media3.common.Timeline.Window;
 import androidx.media3.common.util.Assertions;
+import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.exoplayer.upstream.Allocator;
@@ -37,6 +38,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
  */
 @UnstableApi
 public final class MaskingMediaSource extends WrappingMediaSource {
+  public static final String TAG = "MaskingMediaSource";
 
   private final boolean useLazyPreparation;
   private final Timeline.Window window;
@@ -112,6 +114,7 @@ public final class MaskingMediaSource extends WrappingMediaSource {
   @Override
   public MaskingMediaPeriod createPeriod(
       MediaPeriodId id, Allocator allocator, long startPositionUs) {
+    Log.d(TAG, "createPeriod() id: " + id + " startPositionUs: " + startPositionUs + " isPrepared: " + isPrepared + " unpreparedMaskingMediaPeriod: " + unpreparedMaskingMediaPeriod);
     MaskingMediaPeriod mediaPeriod = new MaskingMediaPeriod(id, allocator, startPositionUs);
     mediaPeriod.setMediaSource(mediaSource);
     if (isPrepared) {
@@ -132,6 +135,7 @@ public final class MaskingMediaSource extends WrappingMediaSource {
 
   @Override
   public void releasePeriod(MediaPeriod mediaPeriod) {
+    Log.d(TAG, "releasePeriod() - isPrepared: " + isPrepared + " unpreparedMaskingMediaPeriod: " + unpreparedMaskingMediaPeriod);
     ((MaskingMediaPeriod) mediaPeriod).releasePeriod();
     if (mediaPeriod == unpreparedMaskingMediaPeriod) {
       unpreparedMaskingMediaPeriod = null;
@@ -140,6 +144,7 @@ public final class MaskingMediaSource extends WrappingMediaSource {
 
   @Override
   public void releaseSourceInternal() {
+    Log.d(TAG, "releaseSourceInternal() - isPrepared: " + isPrepared + " unpreparedMaskingMediaPeriod: " + unpreparedMaskingMediaPeriod);
     isPrepared = false;
     hasStartedPreparing = false;
     super.releaseSourceInternal();
@@ -150,6 +155,7 @@ public final class MaskingMediaSource extends WrappingMediaSource {
     @Nullable MediaPeriodId idForMaskingPeriodPreparation = null;
     if (isPrepared) {
       timeline = timeline.cloneWithUpdatedTimeline(newTimeline);
+      Log.d(TAG, "onChildSourceInfoRefreshed() isPrepared - clonedTimeline: " + timeline + " unpreparedMaskingMediaPeriod: " + unpreparedMaskingMediaPeriod);
       if (unpreparedMaskingMediaPeriod != null) {
         // Reset override in case the duration changed and we need to update our override.
         setPreparePositionOverrideToUnpreparedMaskingPeriod(
@@ -185,6 +191,11 @@ public final class MaskingMediaSource extends WrappingMediaSource {
         long windowPreparePositionUs = period.getPositionInWindowUs() + periodPreparePositionUs;
         long oldWindowDefaultPositionUs =
             timeline.getWindow(/* windowIndex= */ 0, window).getDefaultPositionUs();
+        Log.d(TAG, "onChildSourceInfoRefreshed() not prepared - timeline: " + timeline
+            + " unpreparedMaskingMediaPeriod: " + unpreparedMaskingMediaPeriod
+            + " windowStartPositionUs: " + windowStartPositionUs
+            + " oldWindowDefaultPositionUs: " + oldWindowDefaultPositionUs
+        );
         if (windowPreparePositionUs != oldWindowDefaultPositionUs) {
           windowStartPositionUs = windowPreparePositionUs;
         }

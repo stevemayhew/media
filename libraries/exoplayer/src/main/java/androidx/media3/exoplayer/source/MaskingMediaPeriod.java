@@ -19,9 +19,11 @@ import static androidx.media3.common.util.Assertions.checkNotNull;
 import static androidx.media3.common.util.Assertions.checkState;
 import static androidx.media3.common.util.Util.castNonNull;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.util.NullableType;
+import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.LoadingInfo;
 import androidx.media3.exoplayer.SeekParameters;
@@ -39,6 +41,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
  */
 @UnstableApi
 public final class MaskingMediaPeriod implements MediaPeriod, MediaPeriod.Callback {
+  public static final String TAG = "MaskingMediaPeriod";
 
   /** Listener for preparation events. */
   public interface PrepareListener {
@@ -80,6 +83,7 @@ public final class MaskingMediaPeriod implements MediaPeriod, MediaPeriod.Callba
     this.allocator = allocator;
     this.preparePositionUs = preparePositionUs;
     preparePositionOverrideUs = C.TIME_UNSET;
+    Log.d(TAG, "create " + this);
   }
 
   /**
@@ -128,6 +132,7 @@ public final class MaskingMediaPeriod implements MediaPeriod, MediaPeriod.Callba
    */
   public void createPeriod(MediaPeriodId id) {
     long preparePositionUs = getPreparePositionWithOverride(this.preparePositionUs);
+    Log.d(TAG, "createPeriod(" + id + ") - preparePositionUs: " + this.preparePositionUs + " with override: " + preparePositionUs);
     mediaPeriod = checkNotNull(mediaSource).createPeriod(id, allocator, preparePositionUs);
     if (callback != null) {
       mediaPeriod.prepare(/* callback= */ this, preparePositionUs);
@@ -144,6 +149,7 @@ public final class MaskingMediaPeriod implements MediaPeriod, MediaPeriod.Callba
   @Override
   public void prepare(Callback callback, long positionUs) {
     this.callback = callback;
+    Log.d(TAG, "prepare() - positionUs: " + positionUs + " this.preparePositionUs:  " + this.preparePositionUs + ", with override: " + getPreparePositionWithOverride(this.preparePositionUs));
     if (mediaPeriod != null) {
       mediaPeriod.prepare(
           /* callback= */ this, getPreparePositionWithOverride(this.preparePositionUs));
@@ -181,12 +187,19 @@ public final class MaskingMediaPeriod implements MediaPeriod, MediaPeriod.Callba
       @NullableType SampleStream[] streams,
       boolean[] streamResetFlags,
       long positionUs) {
+    Log.d(TAG, "selectTracks() - positionUs: " + positionUs
+        + " preparePositionUs: " + preparePositionUs
+        + " preparePositionOverrideUs: " + preparePositionOverrideUs);
     if (preparePositionOverrideUs != C.TIME_UNSET && positionUs == preparePositionUs) {
+      Log.d(TAG, "selectTracks() - reset positionOverrideUs");
       positionUs = preparePositionOverrideUs;
       preparePositionOverrideUs = C.TIME_UNSET;
     }
-    return castNonNull(mediaPeriod)
+    long resolvedPositionUs = castNonNull(mediaPeriod)
         .selectTracks(selections, mayRetainStreamFlags, streams, streamResetFlags, positionUs);
+    Log.d(TAG, "selectTracks() - return positionUs: " + positionUs);
+
+    return resolvedPositionUs;
   }
 
   @Override
@@ -243,6 +256,7 @@ public final class MaskingMediaPeriod implements MediaPeriod, MediaPeriod.Callba
 
   @Override
   public void onPrepared(MediaPeriod mediaPeriod) {
+    Log.d(TAG, "onPrepared() - mediaPeriod: " + mediaPeriod + " this: " + this);
     castNonNull(callback).onPrepared(this);
     if (listener != null) {
       listener.onPrepareComplete(id);
@@ -253,5 +267,11 @@ public final class MaskingMediaPeriod implements MediaPeriod, MediaPeriod.Callba
     return preparePositionOverrideUs != C.TIME_UNSET
         ? preparePositionOverrideUs
         : preparePositionUs;
+  }
+
+  @NonNull
+  @Override
+  public String toString() {
+    return "MaskingMediaPeriod [ preparePositionOverrideUs: " + preparePositionOverrideUs + ", preparePositionUs: " + preparePositionUs + " maskedPeriod: " + mediaPeriod +"]";
   }
 }

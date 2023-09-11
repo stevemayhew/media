@@ -15,6 +15,10 @@
  */
 package androidx.media3.demo.main;
 
+import static androidx.media3.common.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED;
+import static androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT;
+
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -29,6 +33,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
@@ -36,8 +41,10 @@ import androidx.media3.common.ErrorMessageProvider;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.Timeline;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
+import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSource;
@@ -64,6 +71,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 /** An activity that plays media using {@link ExoPlayer}. */
 public class PlayerActivity extends AppCompatActivity
     implements OnClickListener, PlayerView.ControllerVisibilityListener {
+
+  public static final String TAG = "PlayerActivity";
 
   // Saved instance state keys.
 
@@ -261,6 +270,7 @@ public class PlayerActivity extends AppCompatActivity
   /**
    * @return Whether initialization was successful.
    */
+  @OptIn(markerClass = UnstableApi.class)
   protected boolean initializePlayer() {
     if (player == null) {
       Intent intent = getIntent();
@@ -279,6 +289,7 @@ public class PlayerActivity extends AppCompatActivity
       player = playerBuilder.build();
       player.setTrackSelectionParameters(trackSelectionParameters);
       player.addListener(new PlayerEventListener());
+      player.addListener(new BugListener());
       player.addAnalyticsListener(new EventLogger());
       player.setAudioAttributes(AudioAttributes.DEFAULT, /* handleAudioFocus= */ true);
       player.setPlayWhenReady(startAutoPlay);
@@ -290,6 +301,10 @@ public class PlayerActivity extends AppCompatActivity
     boolean haveStartPosition = startItemIndex != C.INDEX_UNSET;
     if (haveStartPosition) {
       player.seekTo(startItemIndex, startPosition);
+    } else if (getIntent().hasExtra("start_at")) {
+      haveStartPosition = true;
+      Log.d(TAG, "starting at " + getIntent().getLongExtra("start_at", 0));
+      player.seekTo(0, getIntent().getLongExtra("start_at", 0));
     }
     player.setMediaItems(mediaItems, /* resetPosition= */ !haveStartPosition);
     player.prepare();
@@ -472,6 +487,68 @@ public class PlayerActivity extends AppCompatActivity
     Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
   }
 
+  private static boolean bug_triggered = false;
+
+  private class BugListener implements Player.Listener {
+
+    @Override
+    @OptIn(markerClass = UnstableApi.class)
+    public void onPlaybackStateChanged(@Player.State int playbackState) {
+      Log.d(TAG, "onPlaybackStateChanged() - " + playbackState);
+
+      if (getIntent().getBooleanExtra("trigger_bug", false) && !bug_triggered) {
+        playerView.setControllerAutoShow(false);
+        playerView.setControllerShowTimeoutMs(-1);
+        playerView.showController();
+        if (playbackState == Player.STATE_READY) {
+          bug_triggered = true;
+          TrackSelectionParameters disableTracksParameters =
+              trackSelectionParameters
+                  .buildUpon()
+                  .setMaxVideoBitrate(3000000 - 1)
+                  .build();
+          player.setTrackSelectionParameters(disableTracksParameters);
+          long pos = player.getCurrentPosition();
+          while (pos > 0) {
+            Log.d(TAG, "seekTo - " + pos);
+            player.seekTo(pos);
+            pos -= 600_000L;
+            android.os.SystemClock.sleep(500);
+          }
+          player.setPlayWhenReady(false);
+          Log.d(TAG, "seekTo final to 0");
+          player.seekTo(0);
+          Log.d(TAG, "run track selection");
+          player.setTrackSelectionParameters(trackSelectionParameters);
+        }
+      }
+    }
+  }
+
+  interface RecoveryOptionCallback {
+    void onUserAction(boolean shouldRecover);
+  }
+
+
+  private void showErrorDialogWithRecoveryOption(PlaybackException error, RecoveryOptionCallback callback) {
+    AlertDialog alertDialog = new AlertDialog.Builder(this)
+        .setTitle("Error - " + error.getErrorCodeName())
+        .setPositiveButton("Retry", (dialog, which) -> {
+          callback.onUserAction(true);
+          player.seekToDefaultPosition();
+          player.prepare();   // Attempt recovery with simple re-prepare using current MediaItem
+          dialog.dismiss();
+        })
+        .setNegativeButton("Ok", (dialog, which) -> {
+          callback.onUserAction(true);
+          player.stop();
+          player.clearMediaItems();
+          dialog.dismiss();
+        })
+        .create();
+    alertDialog.show();
+  }
+
   private class PlayerEventListener implements Player.Listener {
 
     @Override
@@ -483,14 +560,36 @@ public class PlayerActivity extends AppCompatActivity
     }
 
     @Override
+    @OptIn(markerClass = UnstableApi.class)
     public void onPlayerError(PlaybackException error) {
-      if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
-        player.seekToDefaultPosition();
-        player.prepare();
-      } else {
-        updateButtonVisibility();
-        showControls();
-      }
+      Log.d(TAG, "onPlayerError() - " + error.getErrorCodeName());
+
+      showErrorDialogWithRecoveryOption(error, new RecoveryOptionCallback() {
+        @Override
+        public void onUserAction(boolean shouldRecover) {
+          if (shouldRecover) {
+            switch (error.errorCode) {
+              case ERROR_CODE_BEHIND_LIVE_WINDOW:
+                player.seekTo(1);   // TODO allow fix to seek to 0
+                player.prepare();
+                break;
+
+              case ERROR_CODE_IO_NETWORK_CONNECTION_FAILED:
+              case ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT:
+                Timeline timeline = player.getCurrentTimeline();
+                if (! timeline.isEmpty()) {
+                  Timeline.Window window = timeline.getWindow(0, new Timeline.Window());
+                  if (window.isLive()) {
+                    player.seekToDefaultPosition();
+                  }
+                }
+            }
+          } else {
+            updateButtonVisibility();
+            showControls();
+          }
+        }
+      });
     }
 
     @Override
