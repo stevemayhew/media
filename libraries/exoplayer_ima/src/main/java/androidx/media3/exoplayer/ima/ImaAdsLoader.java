@@ -31,10 +31,12 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.media3.common.AdViewProvider;
 import androidx.media3.common.C;
+import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaLibraryInfo;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.Player;
 import androidx.media3.common.Timeline;
+import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSpec;
@@ -94,6 +96,8 @@ public final class ImaAdsLoader implements AdsLoader {
   static {
     MediaLibraryInfo.registerModule("media3.exoplayer.ima");
   }
+
+  public static final String TAG = "ImaAdsLoader";
 
   /** Builder for {@link ImaAdsLoader}. */
   public static final class Builder {
@@ -487,6 +491,9 @@ public final class ImaAdsLoader implements AdsLoader {
    */
   @UnstableApi
   public void requestAds(DataSpec adTagDataSpec, Object adsId, @Nullable ViewGroup adViewGroup) {
+    if (configuration.debugModeEnabled) {
+      Log.d(TAG, "requestAds() adsId:  " + adsId);
+    }
     if (!adTagLoaderByAdsId.containsKey(adsId)) {
       AdTagLoader adTagLoader =
           new AdTagLoader(
@@ -569,6 +576,9 @@ public final class ImaAdsLoader implements AdsLoader {
       EventListener eventListener) {
     checkState(
         wasSetPlayerCalled, "Set player using adsLoader.setPlayer before preparing the player.");
+    if (configuration.debugModeEnabled) {
+      Log.d(TAG, "activate() currentPlayer:  " + player);
+    }
     if (adTagLoaderByAdsMediaSource.isEmpty()) {
       player = nextPlayer;
       @Nullable Player player = this.player;
@@ -591,6 +601,9 @@ public final class ImaAdsLoader implements AdsLoader {
   @UnstableApi
   @Override
   public void stop(AdsMediaSource adsMediaSource, EventListener eventListener) {
+    if (configuration.debugModeEnabled) {
+      Log.d(TAG, "stop() currentPlayer:  " + player);
+    }
     @Nullable AdTagLoader removedAdTagLoader = adTagLoaderByAdsMediaSource.remove(adsMediaSource);
     maybeUpdateCurrentAdTagLoader();
     if (removedAdTagLoader != null) {
@@ -627,6 +640,9 @@ public final class ImaAdsLoader implements AdsLoader {
   @Override
   public void handlePrepareComplete(
       AdsMediaSource adsMediaSource, int adGroupIndex, int adIndexInAdGroup) {
+    if (configuration.debugModeEnabled) {
+      Log.d(TAG, "handlePrepareComplete() currentPlayer:  " + player);
+    }
     if (player == null) {
       return;
     }
@@ -721,10 +737,21 @@ public final class ImaAdsLoader implements AdsLoader {
     nextAdTagLoader.maybePreloadAds(Util.usToMs(periodPositionUs), Util.usToMs(period.durationUs));
   }
 
+  private static final String logMediaItem(MediaItem mediaItem) {
+    if (mediaItem.localConfiguration != null) {
+      return mediaItem.localConfiguration.uri.toString();
+    } else {
+      return mediaItem.mediaId;
+    }
+  }
+
   private final class PlayerListenerImpl implements Player.Listener {
 
     @Override
     public void onTimelineChanged(Timeline timeline, @Player.TimelineChangeReason int reason) {
+      if (configuration.debugModeEnabled) {
+        Log.d(TAG, "onTimelineChanged() currentPlayer:  " + player + " reason: " + reason + " mediaItem: " + logMediaItem(player.getCurrentMediaItem()));
+      }
       if (timeline.isEmpty()) {
         // The player is being reset or contains no media.
         return;

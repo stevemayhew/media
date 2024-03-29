@@ -374,7 +374,9 @@ public class PlayerActivity extends AppCompatActivity
   private AdsLoader getClientSideAdsLoader(MediaItem.AdsConfiguration adsConfiguration) {
     // The ads loader is reused for multiple playbacks, so that ad playback can resume.
     if (clientSideAdsLoader == null) {
-      clientSideAdsLoader = new ImaAdsLoader.Builder(/* context= */ this).build();
+      clientSideAdsLoader = new ImaAdsLoader.Builder(/* context= */ this)
+          .setDebugModeEnabled(true)
+          .build();
     }
     clientSideAdsLoader.setPlayer(player);
     return clientSideAdsLoader;

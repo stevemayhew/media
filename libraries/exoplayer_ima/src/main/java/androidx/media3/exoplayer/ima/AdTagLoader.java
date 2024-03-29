@@ -364,6 +364,9 @@ import java.util.Map;
 
   /** Activates playback. */
   public void activate(Player player) {
+    if (configuration.debugModeEnabled) {
+      Log.d(TAG, "activate() currentPlayer:  " + player);
+    }
     this.player = player;
     player.addListener(this);
 
