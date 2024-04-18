@@ -19,6 +19,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.Pair;
 import android.view.KeyEvent;
 import android.view.View;
@@ -136,9 +137,24 @@ public class PlayerActivity extends AppCompatActivity
   @Override
   public void onNewIntent(Intent intent) {
     super.onNewIntent(intent);
-    releasePlayer();
-    releaseClientSideAdsLoader();
-    clearStartPosition();
+    String action = intent.getAction();
+    action = action == null ? "" : action;
+    switch (action) {
+      case "seek_to":
+        long seekTo = intent.getIntExtra("position_ms", -1);
+        if (seekTo == -1) {
+          Log.e("PlayerActivity", "Must specify seek position with --ei position_ms = n, in ms");
+        } else {
+          player.seekTo(seekTo);
+        }
+        break;
+
+      default:
+        releasePlayer();
+        releaseClientSideAdsLoader();
+        clearStartPosition();
+        break;
+    }
     setIntent(intent);
   }
 

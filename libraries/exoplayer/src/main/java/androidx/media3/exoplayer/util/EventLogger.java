@@ -455,6 +455,7 @@ public class EventLogger implements AnalyticsListener {
   @Override
   public void onLoadStarted(
       EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData) {
+    logd(eventTime, "loadStarted");
     // Do nothing.
   }
 

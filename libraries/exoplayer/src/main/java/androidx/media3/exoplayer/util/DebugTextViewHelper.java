@@ -22,6 +22,8 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.ColorInfo;
 import androidx.media3.common.Format;
 import androidx.media3.common.Player;
+import androidx.media3.common.Timeline;
+import androidx.media3.common.Timeline.Window;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.DecoderCounters;
@@ -118,9 +120,29 @@ public class DebugTextViewHelper {
         playbackStateString = "unknown";
         break;
     }
-    return String.format(
-        "playWhenReady:%s playbackState:%s item:%s",
-        player.getPlayWhenReady(), playbackStateString, player.getCurrentMediaItemIndex());
+
+    float positionSeconds = player.getContentPosition() / 1000.0f;
+    int currentMediaItemIndex = player.getCurrentMediaItemIndex();
+    Timeline timeline = player.getCurrentTimeline();
+    String stateString = "";
+    if (!timeline.isEmpty()) {
+      Window window = timeline.getWindow(currentMediaItemIndex, new Window());
+      float durationSeconds = window.durationUs / 1000000.0f;
+      boolean isDymanic = window.isLive();
+      float bufferedSeconds = player.getTotalBufferedDuration() / 1000.0f;
+      float bufferedPosition = player.getBufferedPosition() / 1000.0f;
+
+      stateString = String.format(
+          "playWhenReady:%s playbackState:%s item:%s live:%s pos: %10.2f dur: %9.2f buf: %2.1f bufPos: ",
+          player.getPlayWhenReady(), playbackStateString, currentMediaItemIndex, isDymanic, positionSeconds, durationSeconds, bufferedSeconds, bufferedPosition);
+    } else {
+      stateString = String.format(
+          "playWhenReady:%s playbackState:%s item:%s",
+          player.getPlayWhenReady(), playbackStateString, currentMediaItemIndex);
+
+    }
+
+    return stateString;
   }
 
   /** Returns a string containing video debugging information. */
