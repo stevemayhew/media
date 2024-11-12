@@ -45,6 +45,7 @@ import androidx.media3.exoplayer.source.MediaLoadData;
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy;
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy.LoadErrorInfo;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -337,6 +338,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   @Override
   public void release(@Nullable DrmSessionEventListener.EventDispatcher eventDispatcher) {
     verifyPlaybackThread();
+    Log.d(TAG, "release() - " + this);
     if (referenceCount <= 0) {
       Log.e(TAG, "release() called on a session that's already fully released.");
       return;
@@ -434,6 +436,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       return;
     }
     byte[] sessionId = Util.castNonNull(this.sessionId);
+    Log.d(TAG, "doLicense() - allowRetry: " + allowRetry + " session: [" + this + "]");
     switch (mode) {
       case DefaultDrmSessionManager.MODE_PLAYBACK:
       case DefaultDrmSessionManager.MODE_QUERY:
@@ -495,6 +498,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private void postKeyRequest(byte[] scope, int type, boolean allowRetry) {
     try {
       currentKeyRequest = mediaDrm.getKeyRequest(scope, schemeDatas, type, keyRequestParameters);
+      Log.d(TAG,"postKeyRequest() - type: " + type + " allowRetry: " + allowRetry + " params: " + keyRequestParameters + " keyRequest: " + currentKeyRequest );
       Util.castNonNull(requestHandler)
           .post(MSG_KEYS, Assertions.checkNotNull(currentKeyRequest), allowRetry);
     } catch (Exception | NoSuchMethodError e) {
@@ -604,6 +608,24 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
               + playbackLooper.getThread().getName(),
           new IllegalStateException());
     }
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder str =  new StringBuilder("DefaultDrmSession - state: " + state + " mode: " + mode + " refCount: " + referenceCount);
+    if (sessionId != null) {
+      str.append(" sessionId: "); str.append(new String(sessionId, Charset.defaultCharset()));
+    }
+
+    if (schemeDatas != null) {
+      str.append(" schemaDatas: [");
+      for (SchemeData schemeData : schemeDatas) {
+        str.append(schemeData);
+        str.append(", ");
+      }
+      str.append("]");
+    }
+    return str.toString();
   }
 
   // Internal classes.

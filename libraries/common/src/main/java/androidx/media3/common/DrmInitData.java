@@ -15,6 +15,8 @@
  */
 package androidx.media3.common;
 
+import android.os.Build.VERSION;
+import android.os.Build.VERSION_CODES;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.TextUtils;
@@ -26,6 +28,7 @@ import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -215,6 +218,15 @@ public final class DrmInitData implements Comparator<SchemeData>, Parcelable {
         : first.uuid.compareTo(second.uuid);
   }
 
+  @Override
+  public String toString() {
+    String datas = "[";
+    for (SchemeData data : schemeDatas) {
+      datas += data.toString() + ", ";
+    }
+    return "DrmInitData - type: " + schemeType + datas + "]";
+  }
+
   // Parcelable implementation.
 
   @Override
@@ -358,6 +370,14 @@ public final class DrmInitData implements Comparator<SchemeData>, Parcelable {
           && Arrays.equals(data, other.data);
     }
 
+    @Override
+    public String toString() {
+      String str = "SchemeData - mime: " + mimeType + " uuid: " + uuid;
+      if (VERSION.SDK_INT >= VERSION_CODES.O) {
+        str = str + " data: " + Base64.getEncoder().encodeToString(data);
+      }
+      return str;
+    }
     @Override
     public int hashCode() {
       if (hashCode == 0) {

@@ -395,6 +395,7 @@ public class DefaultDrmSessionManager implements DrmSessionManager {
 
   @Override
   public final void prepare() {
+    Log.d(TAG, "prepare() - keepAliveSession count: " + sessions.size());
     verifyPlaybackThread(/* allowBeforeSetPlayer= */ true);
     if (prepareCallsCount++ != 0) {
       return;
@@ -412,6 +413,7 @@ public class DefaultDrmSessionManager implements DrmSessionManager {
 
   @Override
   public final void release() {
+    Log.d(TAG, "release() - keepAliveSession count: " + sessions.size());
     verifyPlaybackThread(/* allowBeforeSetPlayer= */ true);
     if (--prepareCallsCount != 0) {
       return;
@@ -504,6 +506,11 @@ public class DefaultDrmSessionManager implements DrmSessionManager {
           break;
         }
       }
+      if (session == null) {
+        Log.d(TAG, "no existing session for SchemaData: " + (schemeDatas != null ? schemeDatas.get(0) : "none"));
+      } else {
+        Log.d(TAG, "reusing existing session: " + session);
+      }
     }
 
     if (session == null) {
@@ -518,6 +525,7 @@ public class DefaultDrmSessionManager implements DrmSessionManager {
         noMultiSessionDrmSession = session;
       }
       sessions.add(session);
+      Log.d(TAG, "acquireSession() - sessions count: " + sessions.size() + " new session: " + session);
     } else {
       session.acquire(eventDispatcher);
     }
@@ -631,6 +639,7 @@ public class DefaultDrmSessionManager implements DrmSessionManager {
     // If we're short on DRM session resources, first try eagerly releasing all our keepalive
     // sessions and then retry the acquisition.
     if (acquisitionFailedIndicatingResourceShortage(session) && !keepaliveSessions.isEmpty()) {
+      Log.d(TAG, "acquire resource shortage and keepaliveSession size: " + keepaliveSessions.size());
       releaseAllKeepaliveSessions();
       undoAcquisition(session, eventDispatcher);
       session = createAndAcquireSession(schemeDatas, isPlaceholderSession, eventDispatcher);
@@ -642,6 +651,7 @@ public class DefaultDrmSessionManager implements DrmSessionManager {
     if (acquisitionFailedIndicatingResourceShortage(session)
         && shouldReleasePreacquiredSessionsBeforeRetrying
         && !preacquiredSessionReferences.isEmpty()) {
+      Log.d(TAG, "acquire resource shortage and preacquiredSessionReferences size: " + preacquiredSessionReferences.size());
       releaseAllPreacquiredSessions();
       if (!keepaliveSessions.isEmpty()) {
         // Some preacquired sessions released above are now in their keepalive timeout phase. We
@@ -891,7 +901,10 @@ public class DefaultDrmSessionManager implements DrmSessionManager {
         keepaliveSessions.add(session);
         checkNotNull(playbackHandler)
             .postAtTime(
-                () -> session.release(/* eventDispatcher= */ null),
+                () -> {
+                  Log.d(TAG, "keepAlive expired for session: " + session);
+                  session.release(/* eventDispatcher= */ null);
+                },
                 session,
                 /* uptimeMillis= */ SystemClock.uptimeMillis() + sessionKeepaliveMs);
       } else if (newReferenceCount == 0) {
