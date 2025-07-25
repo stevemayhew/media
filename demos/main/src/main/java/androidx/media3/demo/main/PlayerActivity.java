@@ -377,7 +377,8 @@ public class PlayerActivity extends AppCompatActivity
   private AdsLoader getClientSideAdsLoader(MediaItem.AdsConfiguration adsConfiguration) {
     // The ads loader is reused for multiple playbacks, so that ad playback can resume.
     if (clientSideAdsLoader == null) {
-      clientSideAdsLoader = new ImaAdsLoader.Builder(/* context= */ this).build();
+      clientSideAdsLoader =
+          new ImaAdsLoader.Builder(/* context= */ this).setDebugModeEnabled(true).build();
     }
     clientSideAdsLoader.setPlayer(player);
     return clientSideAdsLoader;
@@ -481,6 +482,11 @@ public class PlayerActivity extends AppCompatActivity
     public void onPlayerError(PlaybackException error) {
       if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
         player.seekToDefaultPosition();
+        player.prepare();
+      } else if (player.isPlayingAd()) {
+        MediaItem noAdsItem =
+            player.getMediaItemAt(0).buildUpon().setAdsConfiguration(null).build();
+        player.setMediaItem(noAdsItem, /* resetPosition= */ true);
         player.prepare();
       } else {
         updateButtonVisibility();

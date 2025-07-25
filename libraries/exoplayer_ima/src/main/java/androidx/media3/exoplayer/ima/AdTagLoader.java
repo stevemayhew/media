@@ -391,6 +391,16 @@ import java.util.Objects;
   /** Deactivates playback. */
   public void deactivate() {
     Player player = checkNotNull(this.player);
+    Log.d(
+        TAG,
+        "deactivate: playingAd: "
+            + ((player == null) ? "no" : player.isPlayingAd())
+            + " imaAdState: "
+            + imaAdState
+            + " adPlaybackState: "
+            + adPlaybackState
+            + " imaPausedContent: "
+            + imaPausedContent);
     // Post release of listener behind any already queued Player.Listener events to ensure that
     // any pending events are processed before the player is deferred.
     handler.post(
@@ -489,6 +499,16 @@ import java.util.Objects;
 
   @Override
   public void onTimelineChanged(Timeline timeline, @Player.TimelineChangeReason int reason) {
+    Log.d(
+        TAG,
+        "timeLineChanged: reason: "
+            + reason
+            + " timeline: "
+            + timeline
+            + " playingAd: "
+            + ((player == null) ? "no" : player.isPlayingAd())
+            + " imaAdState: "
+            + imaAdState);
     if (timeline.isEmpty() || player == null) {
       // The player is being reset or contains no media.
       return;
@@ -511,12 +531,27 @@ import java.util.Objects;
       Player.PositionInfo oldPosition,
       Player.PositionInfo newPosition,
       @Player.DiscontinuityReason int reason) {
+    Log.d(
+        TAG,
+        "positionDiscontinuity: reason: "
+            + reason
+            + " oldPosition: "
+            + oldPosition
+            + " newPosition: "
+            + newPosition
+            + " playingAd: "
+            + ((player == null) ? "no" : player.isPlayingAd())
+            + " imaAdState: "
+            + imaAdState);
+
     handleTimelineOrPositionChanged();
   }
 
   @Override
   public void onPlaybackStateChanged(@Player.State int playbackState) {
     @Nullable Player player = this.player;
+    Log.d(TAG, "playbackStateChanged: playbackState: " + playbackState + " player: " + player);
+
     if (adsManager == null || player == null) {
       return;
     }
@@ -535,6 +570,7 @@ import java.util.Objects;
   @Override
   public void onPlayWhenReadyChanged(
       boolean playWhenReady, @Player.PlayWhenReadyChangeReason int reason) {
+    Log.d(TAG, "playWhenReadyChanged: reason: " + reason + " player: " + player);
     if (adsManager == null || player == null) {
       return;
     }
@@ -553,6 +589,17 @@ import java.util.Objects;
 
   @Override
   public void onPlayerError(PlaybackException error) {
+    Log.d(
+        TAG,
+        "playerError - playingAd: "
+            + ((player == null) ? "no" : player.isPlayingAd())
+            + " imaAdState: "
+            + imaAdState
+            + " callbacks.size(): "
+            + adCallbacks.size()
+            + " error: "
+            + error);
+
     if (imaAdState != IMA_AD_STATE_NONE && player.isPlayingAd()) {
       AdMediaInfo adMediaInfo = checkNotNull(imaAdMediaInfo);
       for (int i = 0; i < adCallbacks.size(); i++) {
@@ -1476,11 +1523,13 @@ import java.util.Objects;
 
     @Override
     public void addCallback(VideoAdPlayerCallback videoAdPlayerCallback) {
+      Log.d(TAG, "addCallback: " + videoAdPlayerCallback);
       adCallbacks.add(videoAdPlayerCallback);
     }
 
     @Override
     public void removeCallback(VideoAdPlayerCallback videoAdPlayerCallback) {
+      Log.d(TAG, "removeCallback: " + videoAdPlayerCallback);
       adCallbacks.remove(videoAdPlayerCallback);
     }
 
